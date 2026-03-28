@@ -17,63 +17,116 @@ jobs:
           - os: macos-14
             target: aarch64-apple-darwin
             artifact: carbonyl.macos-arm64
+            cpu: arm64
           - os: macos-13
             target: x86_64-apple-darwin
             artifact: carbonyl.macos-amd64
+            cpu: amd64
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             artifact: carbonyl.linux-amd64
+            cpu: amd64
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 360
+
+    env:
+      CHROMIUM_ROOT: ${{ github.workspace }}/chromium
+      DEPOT_TOOLS_ROOT: ${{ github.workspace }}/chromium/depot_tools
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
+      - name: Free disk space (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
+          sudo apt-get clean
+          df -h
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            build/${{ matrix.target }}
+          key: rust-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: rust-${{ matrix.target }}-
+
+      - name: Cache Chromium source
+        uses: actions/cache@v4
+        with:
+          path: chromium/src
+          key: chromium-src-${{ matrix.os }}-${{ hashFiles('chromium/.gclient', 'chromium/chromium.gclient') }}
+          restore-keys: chromium-src-${{ matrix.os }}-
+
+      - name: Cache Chromium build objects
+        uses: actions/cache@v4
+        with:
+          path: chromium/src/out/Release
+          key: chromium-build-${{ matrix.os }}-${{ matrix.cpu }}-${{ hashFiles('chromium/patches/**') }}
+          restore-keys: chromium-build-${{ matrix.os }}-${{ matrix.cpu }}-
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            ninja-build \
-            pkg-config \
-            libglib2.0-dev \
-            libatk1.0-dev \
-            libatk-bridge2.0-dev \
-            libcups2-dev \
-            libdrm-dev \
-            libxkbcommon-dev \
-            libxcomposite-dev \
-            libxdamage-dev \
-            libxrandr-dev \
-            libgbm-dev \
-            libpango1.0-dev \
-            libasound2-dev \
-            libnspr4-dev \
-            libnss3-dev
+            ninja-build pkg-config lsb-release \
+            libglib2.0-dev libatk1.0-dev libatk-bridge2.0-dev \
+            libcups2-dev libdrm-dev libxkbcommon-dev \
+            libxcomposite-dev libxdamage-dev libxrandr-dev \
+            libgbm-dev libpango1.0-dev libasound2-dev \
+            libnspr4-dev libnss3-dev
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
         run: brew install ninja
 
-      - name: Sync Chromium (gclient)
-        run: scripts/gclient.sh
+      - name: Sync Chromium source (gclient sync)
+        run: |
+          export PATH="$DEPOT_TOOLS_ROOT:$PATH"
+          cd chromium
+          gclient sync --no-history
 
       - name: Apply patches
         run: scripts/patches.sh apply
 
-      - name: Configure (gn)
-        run: scripts/gn.sh Release ${{ matrix.target }}
+      - name: Configure (gn gen)
+        run: |
+          export PATH="$DEPOT_TOOLS_ROOT:$PATH"
+          cd chromium/src
+          gn gen out/Release --args='import("//carbonyl/src/browser/args.gn") is_debug=false symbol_level=0 target_cpu="${{ matrix.cpu }}"'
 
-      - name: Build
-        run: scripts/build.sh Release
+      - name: Build carbonyl Rust library
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            export MACOSX_DEPLOYMENT_TARGET=10.13
+          fi
+          cargo build --target ${{ matrix.target }} --release
+
+      - name: Copy Rust library to Chromium
+        run: |
+          if [ -f "build/${{ matrix.target }}/release/libcarbonyl.dylib" ]; then
+            cp "build/${{ matrix.target }}/release/libcarbonyl.dylib" chromium/src/out/Release/
+            install_name_tool -id @executable_path/libcarbonyl.dylib "chromium/src/out/Release/libcarbonyl.dylib"
+          else
+            cp "build/${{ matrix.target }}/release/libcarbonyl.so" chromium/src/out/Release/
+          fi
+
+      - name: Build Chromium (ninja)
+        run: |
+          export PATH="$DEPOT_TOOLS_ROOT:$PATH"
+          cd chromium/src
+          ninja -C out/Release headless:headless_shell
 
       - name: Package
         run: |
