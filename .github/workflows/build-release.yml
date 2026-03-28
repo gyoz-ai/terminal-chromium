@@ -113,6 +113,19 @@ jobs:
           cd chromium
           gclient sync --no-history --nohooks
 
+      - name: Fix depot_tools python3 to use system python
+        run: |
+          # depot_tools has its own python3 wrapper that ignores PATH and finds
+          # broken Python 3.14. Replace it with a symlink to our setup-python 3.12.
+          SYSTEM_PYTHON="$(python3 -c 'import sys; print(sys.executable)')"
+          echo "System python3: $SYSTEM_PYTHON"
+          echo "depot_tools python3 before fix: $(cat "$DEPOT_TOOLS_ROOT/python3" | head -1)"
+          rm -f "$DEPOT_TOOLS_ROOT/python3"
+          ln -s "$SYSTEM_PYTHON" "$DEPOT_TOOLS_ROOT/python3"
+          echo "depot_tools python3 now points to: $(readlink "$DEPOT_TOOLS_ROOT/python3")"
+          # Verify pkg_resources works
+          "$DEPOT_TOOLS_ROOT/python3" -c "import pkg_resources; print('pkg_resources OK')"
+
       - name: Run gclient hooks
         run: |
           export PATH="$DEPOT_TOOLS_ROOT:$PATH"
