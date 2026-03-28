@@ -85,7 +85,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            ninja-build pkg-config lsb-release \
+            ninja-build pkg-config lsb-release gperf \
             libglib2.0-dev libatk1.0-dev libatk-bridge2.0-dev \
             libcups2-dev libdrm-dev libxkbcommon-dev \
             libxcomposite-dev libxdamage-dev libxrandr-dev \
@@ -94,9 +94,10 @@ jobs:
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
-        run: |
-          brew install ninja
-          pip3 install --break-system-packages setuptools
+        run: brew install ninja
+
+      - name: Install Python setuptools (needed by gclient)
+        run: pip3 install --break-system-packages setuptools 2>/dev/null || pip3 install setuptools || true
 
       - name: Sync Chromium source (gclient sync)
         run: |
