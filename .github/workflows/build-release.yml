@@ -44,6 +44,14 @@ jobs:
           git config --global user.email "ci@gyoz.ai"
           git config --global user.name "gyoz-ai CI"
 
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python setuptools
+        run: pip install setuptools
+
       - name: Free disk space (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -102,26 +110,9 @@ jobs:
           cd chromium
           gclient sync --no-history --nohooks
 
-      - name: Install setuptools into depot_tools Python
-        run: |
-          export PATH="$DEPOT_TOOLS_ROOT:$PATH"
-          # Find the ACTUAL python3 binary depot_tools uses (cipd-downloaded)
-          REAL_PYTHON=$(python3 -c "import sys; print(sys.executable)" 2>/dev/null)
-          echo "depot_tools python3 resolves to: $REAL_PYTHON"
-          # Install setuptools into it
-          "$REAL_PYTHON" -m pip install --break-system-packages setuptools 2>/dev/null || \
-          "$REAL_PYTHON" -m pip install setuptools 2>/dev/null || true
-          # Verify
-          "$REAL_PYTHON" -c "import pkg_resources; print('pkg_resources OK')" || echo "STILL MISSING"
-          # Also install into system python as fallback
-          /usr/bin/python3 -m pip install --break-system-packages setuptools 2>/dev/null || true
-
       - name: Run gclient hooks
         run: |
           export PATH="$DEPOT_TOOLS_ROOT:$PATH"
-          # Force hooks to use the system python which has setuptools
-          export VPYTHON_BYPASS="manually managed python not in venv"
-          export GCLIENT_PY3=1
           cd chromium
           gclient runhooks
 
