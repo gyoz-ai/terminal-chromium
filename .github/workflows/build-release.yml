@@ -122,7 +122,7 @@ jobs:
         run: |
           export PATH="$DEPOT_TOOLS_ROOT:$PATH"
           cd chromium/src
-          gn gen out/Release --args='import("//carbonyl/src/browser/args.gn") is_debug=false symbol_level=0 target_cpu="${{ matrix.gn_cpu }}"'
+          gn gen out/Release --args='import("//carbonyl/src/browser/args.gn") is_debug=false symbol_level=0 treat_warnings_as_errors=false target_cpu="${{ matrix.gn_cpu }}"'
 
       - name: Build carbonyl Rust library
         run: |
