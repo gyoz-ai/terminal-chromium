@@ -96,22 +96,26 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install ninja
 
-      - name: Install Python setuptools (needed by gclient hooks)
-        run: |
-          # Install for ALL pythons we can find — gclient hooks use depot_tools' python3
-          pip3 install --break-system-packages setuptools 2>/dev/null || pip3 install setuptools || true
-          # Also install into depot_tools' vendored python if it exists
-          if [ -f "$DEPOT_TOOLS_ROOT/python3" ]; then
-            "$DEPOT_TOOLS_ROOT/python3" -m pip install setuptools 2>/dev/null || true
-          fi
-          # Ensure VPYTHON_BYPASS so hooks use system python with setuptools
-          echo "VPYTHON_BYPASS=manually managed python not in venv" >> "$GITHUB_ENV"
-
-      - name: Sync Chromium source (gclient sync)
+      - name: Sync Chromium source (without hooks)
         run: |
           export PATH="$DEPOT_TOOLS_ROOT:$PATH"
           cd chromium
-          gclient sync --no-history
+          gclient sync --no-history --nohooks
+
+      - name: Install setuptools into depot_tools Python
+        run: |
+          export PATH="$DEPOT_TOOLS_ROOT:$PATH"
+          # depot_tools' python3 is now available after gclient sync downloaded it
+          # Install setuptools so hooks like mac_toolchain.py can import pkg_resources
+          python3 -m pip install setuptools 2>/dev/null || \
+          python3 -m pip install --break-system-packages setuptools 2>/dev/null || \
+          pip3 install --break-system-packages setuptools 2>/dev/null || true
+
+      - name: Run gclient hooks
+        run: |
+          export PATH="$DEPOT_TOOLS_ROOT:$PATH"
+          cd chromium
+          gclient runhooks
 
       - name: Apply patches
         run: scripts/patches.sh apply
