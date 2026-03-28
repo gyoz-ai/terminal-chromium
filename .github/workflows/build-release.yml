@@ -39,6 +39,11 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Configure git identity
+        run: |
+          git config --global user.email "ci@gyoz.ai"
+          git config --global user.name "gyoz-ai CI"
+
       - name: Free disk space (Linux)
         if: runner.os == 'Linux'
         run: |
