@@ -53,7 +53,18 @@ jobs:
           python-version: '3.12'
 
       - name: Install Python setuptools
-        run: pip install setuptools
+        run: |
+          # Install into actions/setup-python's Python
+          pip install setuptools
+          # Also install into EVERY python3 on the system (the framework one too)
+          for p in /Library/Frameworks/Python.framework/Versions/*/bin/python3 /usr/bin/python3 /opt/homebrew/bin/python3*; do
+            [ -x "$p" ] && "$p" -m pip install --break-system-packages setuptools 2>/dev/null || true
+          done
+          # Verify all python3s have it
+          echo "=== Checking all python3s ==="
+          for p in $(which -a python3); do
+            echo -n "$p: " && "$p" -c "import pkg_resources; print('OK')" 2>&1
+          done
 
       - name: Free disk space (Linux)
         if: runner.os == 'Linux'
@@ -113,18 +124,20 @@ jobs:
           cd chromium
           gclient sync --no-history --nohooks
 
-      - name: Fix depot_tools python3 to use system python
+      - name: Ensure depot_tools uses python with setuptools
         run: |
-          # depot_tools has its own python3 wrapper that ignores PATH and finds
-          # broken Python 3.14. Replace it with a symlink to our setup-python 3.12.
-          SYSTEM_PYTHON="$(python3 -c 'import sys; print(sys.executable)')"
-          echo "System python3: $SYSTEM_PYTHON"
-          echo "depot_tools python3 before fix: $(cat "$DEPOT_TOOLS_ROOT/python3" | head -1)"
-          rm -f "$DEPOT_TOOLS_ROOT/python3"
-          ln -s "$SYSTEM_PYTHON" "$DEPOT_TOOLS_ROOT/python3"
-          echo "depot_tools python3 now points to: $(readlink "$DEPOT_TOOLS_ROOT/python3")"
-          # Verify pkg_resources works
-          "$DEPOT_TOOLS_ROOT/python3" -c "import pkg_resources; print('pkg_resources OK')"
+          export PATH="$DEPOT_TOOLS_ROOT:$PATH"
+          # Show what python3 gclient will actually use
+          GCLIENT_PYTHON="$(which python3)"
+          echo "gclient will use python3 at: $GCLIENT_PYTHON"
+          echo "which resolves to: $("$GCLIENT_PYTHON" -c 'import sys; print(sys.executable)' 2>/dev/null || echo 'FAILED')"
+          # Test it has pkg_resources
+          "$GCLIENT_PYTHON" -c "import pkg_resources; print('pkg_resources OK')" 2>&1 || echo "MISSING — installing"
+          # If missing, force install
+          "$GCLIENT_PYTHON" -m pip install --break-system-packages setuptools 2>/dev/null || \
+          "$GCLIENT_PYTHON" -m pip install setuptools 2>/dev/null || true
+          # Final verify
+          "$GCLIENT_PYTHON" -c "import pkg_resources; print('FINAL CHECK: pkg_resources OK')"
 
       - name: Run gclient hooks
         run: |
