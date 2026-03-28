@@ -33,6 +33,9 @@ jobs:
     env:
       CHROMIUM_ROOT: ${{ github.workspace }}/chromium
       DEPOT_TOOLS_ROOT: ${{ github.workspace }}/chromium/depot_tools
+      # Force depot_tools to use system python3 (not its own wrapper)
+      VPYTHON_BYPASS: "manually managed python not in venv"
+      DEPOT_TOOLS_BOOTSTRAP_PYTHON3: "0"
 
     steps:
       - uses: actions/checkout@v4
