@@ -17,15 +17,15 @@ jobs:
           - os: macos-14
             target: aarch64-apple-darwin
             artifact: carbonyl.macos-arm64
-            cpu: arm64
+            gn_cpu: arm64
           - os: macos-13
             target: x86_64-apple-darwin
             artifact: carbonyl.macos-amd64
-            cpu: amd64
+            gn_cpu: x64
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             artifact: carbonyl.linux-amd64
-            cpu: amd64
+            gn_cpu: x64
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 360
@@ -77,8 +77,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: chromium/src/out/Release
-          key: chromium-build-${{ matrix.os }}-${{ matrix.cpu }}-${{ hashFiles('chromium/patches/**') }}
-          restore-keys: chromium-build-${{ matrix.os }}-${{ matrix.cpu }}-
+          key: chromium-build-${{ matrix.os }}-${{ matrix.gn_cpu }}-${{ hashFiles('chromium/patches/**') }}
+          restore-keys: chromium-build-${{ matrix.os }}-${{ matrix.gn_cpu }}-
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
@@ -94,7 +94,9 @@ jobs:
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
-        run: brew install ninja
+        run: |
+          brew install ninja
+          pip3 install setuptools
 
       - name: Sync Chromium source (gclient sync)
         run: |
@@ -109,7 +111,7 @@ jobs:
         run: |
           export PATH="$DEPOT_TOOLS_ROOT:$PATH"
           cd chromium/src
-          gn gen out/Release --args='import("//carbonyl/src/browser/args.gn") is_debug=false symbol_level=0 target_cpu="${{ matrix.cpu }}"'
+          gn gen out/Release --args='import("//carbonyl/src/browser/args.gn") is_debug=false symbol_level=0 target_cpu="${{ matrix.gn_cpu }}"'
 
       - name: Build carbonyl Rust library
         run: |
