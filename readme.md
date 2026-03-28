@@ -49,6 +49,14 @@ $ carbonyl https://github.com
 
 ## Demo
 
+### Claude Code + Terminal Chromium
+
+Browse the web from your terminal, controlled by AI via CDP:
+
+https://github.com/gyoz-ai/terminal-chromium/raw/main/demo.mp4
+
+### Original Carbonyl Demos
+
 <table>
   <tbody>
     <tr>
