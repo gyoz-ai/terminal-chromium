@@ -104,22 +104,18 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install ninja
 
-      - name: Sync Chromium source (without hooks)
+      - name: Sync Chromium source and run hooks
         run: |
           export PATH="$DEPOT_TOOLS_ROOT:$PATH"
           cd chromium
+          # First sync downloads source + bootstraps depot_tools python
           gclient sync --no-history --nohooks
-
-      - name: Patch mac_toolchain.py (Xcode already on runner, skip pkg_resources)
-        if: runner.os == 'macOS'
-        run: |
-          echo 'import sys; sys.exit(0)' > chromium/src/build/mac_toolchain.py
-          echo "Patched mac_toolchain.py to exit 0 (Xcode already installed on runner)"
-
-      - name: Run gclient hooks
-        run: |
-          export PATH="$DEPOT_TOOLS_ROOT:$PATH"
-          cd chromium
+          # Patch mac_toolchain.py BEFORE hooks (it imports pkg_resources which is broken on macOS runners)
+          if [ -f src/build/mac_toolchain.py ]; then
+            echo 'import sys; sys.exit(0)' > src/build/mac_toolchain.py
+            echo "Patched mac_toolchain.py (Xcode already on runner)"
+          fi
+          # Now run hooks
           gclient runhooks
 
       - name: Apply patches
