@@ -52,20 +52,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install Python setuptools
-        run: |
-          # Install into actions/setup-python's Python
-          pip install setuptools
-          # Also install into EVERY python3 on the system (the framework one too)
-          for p in /Library/Frameworks/Python.framework/Versions/*/bin/python3 /usr/bin/python3 /opt/homebrew/bin/python3*; do
-            [ -x "$p" ] && "$p" -m pip install --break-system-packages setuptools 2>/dev/null || true
-          done
-          # Verify all python3s have it
-          echo "=== Checking all python3s ==="
-          for p in $(which -a python3); do
-            echo -n "$p: " && "$p" -c "import pkg_resources; print('OK')" 2>&1
-          done
-
       - name: Free disk space (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -124,20 +110,11 @@ jobs:
           cd chromium
           gclient sync --no-history --nohooks
 
-      - name: Ensure depot_tools uses python with setuptools
+      - name: Patch mac_toolchain.py (Xcode already on runner, skip pkg_resources)
+        if: runner.os == 'macOS'
         run: |
-          export PATH="$DEPOT_TOOLS_ROOT:$PATH"
-          # Show what python3 gclient will actually use
-          GCLIENT_PYTHON="$(which python3)"
-          echo "gclient will use python3 at: $GCLIENT_PYTHON"
-          echo "which resolves to: $("$GCLIENT_PYTHON" -c 'import sys; print(sys.executable)' 2>/dev/null || echo 'FAILED')"
-          # Test it has pkg_resources
-          "$GCLIENT_PYTHON" -c "import pkg_resources; print('pkg_resources OK')" 2>&1 || echo "MISSING — installing"
-          # If missing, force install
-          "$GCLIENT_PYTHON" -m pip install --break-system-packages setuptools 2>/dev/null || \
-          "$GCLIENT_PYTHON" -m pip install setuptools 2>/dev/null || true
-          # Final verify
-          "$GCLIENT_PYTHON" -c "import pkg_resources; print('FINAL CHECK: pkg_resources OK')"
+          echo 'import sys; sys.exit(0)' > chromium/src/build/mac_toolchain.py
+          echo "Patched mac_toolchain.py to exit 0 (Xcode already installed on runner)"
 
       - name: Run gclient hooks
         run: |
