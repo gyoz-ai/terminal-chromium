@@ -213,3 +213,4 @@ jobs:
           name: Terminal Chromium ${{ inputs.version }}
           files: artifacts/**/*.zip
           generate_release_notes: true
+
