@@ -127,10 +127,13 @@ jobs:
             echo "Patched mac_toolchain.py (Xcode already on runner)"
           fi
           # Patch Skia Metal bridge cast error (dispatch_semaphore_t cast incompatible with newer SDK)
-          if [ -f src/third_party/skia/src/gpu/ganesh/mtl/GrMtlGpu.mm ]; then
-            sed -i.bak 's/(__bridge_retained const void\*)fSharedEvent\.fSemaphore/(const void*)CFBridgingRetain(fSharedEvent.fSemaphore)/g; s/(__bridge dispatch_semaphore_t)sharedEventSemaphore/(dispatch_semaphore_t)CFBridgingRelease(sharedEventSemaphore)/g' \
-              src/third_party/skia/src/gpu/ganesh/mtl/GrMtlGpu.mm
-            echo "Patched GrMtlGpu.mm bridge casts"
+          SKIA_FILE="src/third_party/skia/src/gpu/ganesh/mtl/GrMtlGpu.mm"
+          if [ -f "$SKIA_FILE" ]; then
+            # Line 1587: (__bridge_retained const void*) semaphore → (const void*)CFBridgingRetain(semaphore)
+            sed -i.bak 's/(__bridge_retained const void\*) semaphore/(const void*)CFBridgingRetain(semaphore)/g' "$SKIA_FILE"
+            # Line 1593: (__bridge dispatch_semaphore_t)cfFence → (dispatch_semaphore_t)CFBridgingRelease(cfFence)
+            sed -i.bak 's/(__bridge dispatch_semaphore_t)cfFence/(dispatch_semaphore_t)CFBridgingRelease(cfFence)/g' "$SKIA_FILE"
+            grep -n "CFBridging" "$SKIA_FILE" && echo "Patched GrMtlGpu.mm bridge casts" || echo "PATCH FAILED"
           fi
           # Now run hooks
           gclient runhooks
