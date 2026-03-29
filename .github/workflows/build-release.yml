@@ -44,7 +44,7 @@ jobs:
           git config --global user.email "ci@gyoz.ai"
           git config --global user.name "gyoz-ai CI"
 
-      - name: Set up Python 3.12
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
