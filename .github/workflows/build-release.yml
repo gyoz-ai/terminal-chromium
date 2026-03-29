@@ -126,6 +126,12 @@ jobs:
             echo 'import sys; sys.exit(0)' > src/build/mac_toolchain.py
             echo "Patched mac_toolchain.py (Xcode already on runner)"
           fi
+          # Patch Skia Metal bridge cast error (dispatch_semaphore_t cast incompatible with newer SDK)
+          if [ -f src/third_party/skia/src/gpu/ganesh/mtl/GrMtlGpu.mm ]; then
+            sed -i.bak 's/(__bridge_retained const void\*)fSharedEvent\.fSemaphore/(const void*)CFBridgingRetain(fSharedEvent.fSemaphore)/g; s/(__bridge dispatch_semaphore_t)sharedEventSemaphore/(dispatch_semaphore_t)CFBridgingRelease(sharedEventSemaphore)/g' \
+              src/third_party/skia/src/gpu/ganesh/mtl/GrMtlGpu.mm
+            echo "Patched GrMtlGpu.mm bridge casts"
+          fi
           # Now run hooks
           gclient runhooks
 
