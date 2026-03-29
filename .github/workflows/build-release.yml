@@ -119,27 +119,24 @@ jobs:
         run: |
           export PATH="$DEPOT_TOOLS_ROOT:$PATH"
           cd chromium
-          # First sync downloads source + bootstraps depot_tools python
           gclient sync --no-history --nohooks
-          # Patch mac_toolchain.py BEFORE hooks (it imports pkg_resources which is broken on macOS runners)
+          # Patch mac_toolchain.py BEFORE hooks
           if [ -f src/build/mac_toolchain.py ]; then
             echo 'import sys; sys.exit(0)' > src/build/mac_toolchain.py
             echo "Patched mac_toolchain.py (Xcode already on runner)"
           fi
-          # Patch Skia Metal bridge cast error (dispatch_semaphore_t cast incompatible with newer SDK)
-          SKIA_FILE="src/third_party/skia/src/gpu/ganesh/mtl/GrMtlGpu.mm"
-          if [ -f "$SKIA_FILE" ]; then
-            # Line 1587: (__bridge_retained const void*) semaphore → (const void*)CFBridgingRetain(semaphore)
-            sed -i.bak 's/(__bridge_retained const void\*) semaphore/(const void*)CFBridgingRetain(semaphore)/g' "$SKIA_FILE"
-            # Line 1593: (__bridge dispatch_semaphore_t)cfFence → (dispatch_semaphore_t)CFBridgingRelease(cfFence)
-            sed -i.bak 's/(__bridge dispatch_semaphore_t)cfFence/(dispatch_semaphore_t)CFBridgingRelease(cfFence)/g' "$SKIA_FILE"
-            grep -n "CFBridging" "$SKIA_FILE" && echo "Patched GrMtlGpu.mm bridge casts" || echo "PATCH FAILED"
-          fi
-          # Now run hooks
           gclient runhooks
 
       - name: Apply patches
         run: scripts/patches.sh apply
+
+      - name: Fix Skia Metal bridge casts (macOS SDK compat)
+        if: runner.os == 'macOS'
+        run: |
+          SKIA_FILE="chromium/src/third_party/skia/src/gpu/ganesh/mtl/GrMtlGpu.mm"
+          sed -i.bak 's/(__bridge_retained const void\*) semaphore/(const void*)CFBridgingRetain(semaphore)/g' "$SKIA_FILE"
+          sed -i.bak 's/(__bridge dispatch_semaphore_t)cfFence/(dispatch_semaphore_t)CFBridgingRelease(cfFence)/g' "$SKIA_FILE"
+          grep -n "CFBridging" "$SKIA_FILE" && echo "Patched GrMtlGpu.mm OK" || echo "PATCH FAILED"
 
       - name: Configure (gn gen)
         run: |
