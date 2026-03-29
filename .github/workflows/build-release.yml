@@ -97,6 +97,20 @@ jobs:
             libgbm-dev libpango1.0-dev libasound2-dev \
             libnspr4-dev libnss3-dev
 
+      - name: Select Xcode 15.0 (Chromium 111 incompatible with 15.4 SDK)
+        if: runner.os == 'macOS'
+        run: |
+          ls /Applications/Xcode*.app/ 2>/dev/null | head -10
+          # Use oldest available Xcode 15.x
+          for xcode in /Applications/Xcode_15.0*.app /Applications/Xcode_15.1*.app /Applications/Xcode_15.2*.app /Applications/Xcode_15.3*.app; do
+            if [ -d "$xcode" ]; then
+              sudo xcode-select -s "$xcode"
+              echo "Selected: $xcode"
+              break
+            fi
+          done
+          xcodebuild -version
+
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
         run: brew install ninja
