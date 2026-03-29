@@ -133,25 +133,10 @@ jobs:
       - name: Fix Skia Metal bridge casts (macOS SDK compat)
         if: runner.os == 'macOS'
         run: |
-          # dispatch_semaphore_t can't be __bridge cast in newer SDKs.
-          # Fix: use C-style casts by wrapping in a helper that compiles without ARC.
-          SKIA_FILE="chromium/src/third_party/skia/src/gpu/ganesh/mtl/GrMtlGpu.mm"
-          # Replace the bridge casts with plain C casts (safe for dispatch objects)
-          sed -i.bak 's/(__bridge_retained const void\*) semaphore/(const void*) dispatch_retain(semaphore), (const void*)semaphore/g' "$SKIA_FILE"
-          # Actually simpler: just remove ARC for this one file in the BUILD.gn
-          GN_FILE="chromium/src/skia/BUILD.gn"
-          # Add -fno-objc-arc for GrMtlGpu.mm
-          sed -i.bak '/sources.*skia_metal_sources/,/]/{
-            /]/a\
-    cflags_objcc = [ "-fno-objc-arc" ]
-          }' "$GN_FILE" 2>/dev/null
-          # Simpler: just patch the file to not use ARC bridges at all
-          # Revert the first sed and do it right
-          cp "$SKIA_FILE.bak" "$SKIA_FILE"
-          sed -i.bak 's/const void\* cfFence = (__bridge_retained const void\*) semaphore;/dispatch_retain(semaphore); const void* cfFence = (const void*) semaphore;/' "$SKIA_FILE"
-          sed -i.bak 's/dispatch_semaphore_t semaphore = (__bridge dispatch_semaphore_t)cfFence;/dispatch_semaphore_t semaphore = (dispatch_semaphore_t)cfFence;/' "$SKIA_FILE"
-          grep -n "cfFence\|dispatch_retain" "$SKIA_FILE" | grep -v "^Binary" | head -4
-          echo "Patched GrMtlGpu.mm — replaced ARC bridges with dispatch_retain/C casts"
+          F="chromium/src/third_party/skia/src/gpu/ganesh/mtl/GrMtlGpu.mm"
+          sed -i.bak 's/const void\* cfFence = (__bridge_retained const void\*) semaphore;/dispatch_retain(semaphore); const void* cfFence = (const void*) semaphore;/' "$F"
+          sed -i.bak 's/dispatch_semaphore_t semaphore = (__bridge dispatch_semaphore_t)cfFence;/dispatch_semaphore_t semaphore = (dispatch_semaphore_t)cfFence;/' "$F"
+          grep -n "cfFence" "$F" | head -4
 
       - name: Configure (gn gen)
         run: |
